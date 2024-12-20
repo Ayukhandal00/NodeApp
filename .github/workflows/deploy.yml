@@ -1,0 +1,67 @@
+name: Node.js CI/CD Deployment with PM2
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Step 1: Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Step 2: Set up Node.js
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'  # or your preferred version
+
+    # Step 3: Install dependencies
+    - name: Install dependencies
+      run: npm install
+
+    # Step 4: Setup SSH Key for the deployment server
+    - name: Set up SSH key
+      uses: webfactory/ssh-agent@v0.5.3
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    # Step 5: Deploy to Local Ubuntu Laptop
+    - name: Deploy to Local Machine
+      run: |
+        ssh -o StrictHostKeyChecking=no username@your-laptop-ip << 'EOF'
+          # Update package list and install pm2 if not installed
+          sudo apt update
+          sudo apt install -y pm2
+
+          # Navigate to your app directory
+          cd /path/to/your/app
+
+          # Pull the latest changes
+          git pull origin main
+
+          # Install dependencies on the remote server
+          npm install
+
+          # Restart or start the app using PM2
+          pm2 stop app_name || true
+          pm2 start app.js --name "app_name"  # Replace 'app_name' with your app's name
+          pm2 save
+
+          # Optionally: Set PM2 to restart on system reboot
+          sudo pm2 startup systemd
+          sudo pm2 save
+        EOF
+
+    # Step 6: Clean up (Optional)
+    - name: Clean up
+      run: |
+        rm -rf node_modules
+        npm install
